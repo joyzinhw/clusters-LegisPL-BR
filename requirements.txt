@@ -8,4 +8,4 @@ matplotlib
 umap-learn
 sentence-transformers  
 plotly
-pip
+gensim

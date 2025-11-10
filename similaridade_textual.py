@@ -29,9 +29,9 @@ SIM_MATRIX_SBERT = "outputs/similarity_sbert.npy"
 SIM_MATRIX_GLOVE = "outputs/similarity_glove.npy"
 SIM_MATRIX_WMD = "outputs/similarity_wmd.npy"
 
-# =============================================================================
-# 🧩 Funções com spaCy em pt-BR
-# =============================================================================
+
+#  Funções com spaCy em pt-BR
+
 
 def carregar_spacy_pt():
     """Carrega o modelo spaCy pt_core_news_lg (com fallback automático)."""
@@ -56,9 +56,8 @@ def tokenizar_texto(texto: str, nlp=None) -> List[str]:
     doc = nlp(texto.lower())
     return [tok.lemma_ for tok in doc if tok.is_alpha and not tok.is_stop]
 
-# =============================================================================
+
 # 🔹 TF-IDF
-# =============================================================================
 
 def computar_tfidf(corpus, max_features: int = 20000, ngram_range=(1,2)):
     """Calcula matriz TF-IDF usando stopwords do spaCy."""
@@ -73,9 +72,9 @@ def computar_tfidf(corpus, max_features: int = 20000, ngram_range=(1,2)):
     print(f"[i] TF-IDF shape: {X.shape}")
     return vect, X
 
-# =============================================================================
+
 # 🔹 SBERT
-# =============================================================================
+
 
 def carregar_sbert_model(model_name: str = "modelos/sbert_paraphrase_multilingual"):
     from sentence_transformers import SentenceTransformer
@@ -89,9 +88,7 @@ def computar_sbert_embeddings(corpus, model_name: str = "modelos/sbert_paraphras
     print(f"[i] SBERT embeddings shape: {embs.shape}")
     return embs
 
-# =============================================================================
 # 🔹 COS (GloVe)
-# =============================================================================
 
 def carregar_glove_pt(path: str = "modelos/glove_s300.txt"):
     """Carrega embeddings GloVe pré-treinados em português (Hartmann et al., 2017)."""
@@ -119,9 +116,9 @@ def computar_glove_embeddings(corpus, embeddings):
     dim = len(next(iter(embeddings.values())))
     return np.vstack([media_embeddings(txt, embeddings, nlp, dim) for txt in corpus])
 
-# =============================================================================
+
 # 🔹 WMD (Word Mover’s Distance)
-# =============================================================================
+
 
 def computar_wmd_matriz(corpus, model):
     """Calcula matriz de distâncias WMD entre textos (tokenizados com spaCy pt-BR)."""
@@ -136,9 +133,9 @@ def computar_wmd_matriz(corpus, model):
             matriz[i, j] = matriz[j, i] = dist
     return matriz
 
-# =============================================================================
+
 # 🔹 Similaridade Genérica
-# =============================================================================
+
 
 def sim_cosine_matrix_dense(X):
     print("[i] Calculando similaridade (cosine) — denso ...")
@@ -148,9 +145,8 @@ def sim_cosine_matrix_sparse(X):
     print("[i] Calculando similaridade TF-IDF (sparse -> denso parcial)...")
     return cosine_similarity(X, dense_output=True)
 
-# =============================================================================
 # 🚀 Execução direta
-# =============================================================================
+
 
 if __name__ == "__main__":
     import joblib

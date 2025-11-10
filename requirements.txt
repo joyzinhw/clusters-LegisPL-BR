@@ -1,0 +1,11 @@
+pandas
+numpy
+scikit-learn
+scipy
+openpyxl
+joblib
+matplotlib
+umap-learn
+sentence-transformers  
+plotly
+pip

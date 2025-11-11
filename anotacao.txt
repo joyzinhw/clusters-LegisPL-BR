@@ -1,0 +1,185 @@
+Pipeline de agrupamento para a base de PLs
+1) Seleção e preparo dos campos
+
+Texto-alvo: ementa (e, se existir, ementa detalhada).
+
+Metadados para análise posterior (não entram na vetorização): ano, autores, partido principal, bloco partidario, uf principal, região, status atual, aprovado, dias tramitacao, tema dominante.
+
+Deduplicação: remova registros com ementa idêntica; marque flag de duplicidade para análise depois.
+
+2) Limpeza e normalização (pt-BR, domínio legislativo)
+
+Unicode/caixa: normalize (NFKC), minúsculas.
+
+Remoções:
+
+Datas e números de lei/atos: regex como r'\b(lei|lc|pec|pl|lei nº|lei n\.|nº)\s*[\d\.\-\/]+'.
+
+Citações de artigos/parágrafos: r'\b(art\.?|artigo|§+)\s*\d+[A-Za-z]?'.
+
+Datas: r'\b\d{1,2}/\d{1,2}/\d{2,4}\b|\b\d{4}-\d{2}-\d{2}\b'.
+
+Pontuação supérflua, URLs, múltiplos espaços.
+
+Stopwords:
+
+Lista padrão em português + lista de domínio: ['lei','dispõe','altera','acrescenta','institui','revoga','da','do','das','dos','câmara','senado','projeto','proposição','trâmite','tramitacao','apresentação','autor','comissão'].
+
+Lematização/stemming:
+
+Preferir lematização (spaCy pt_core_news_lg) para reduzir ruído morfológico.
+
+Se for pesado, um stemmer (RSLP) resolve como fallback.
+
+Tokenização: word tokens; avalie n-grams (1–2) depois da limpeza.
+
+3) Representação (duas trilhas)
+Trilho A — Clássico e robusto
+
+TF-IDF (palavra + eventualmente caractere):
+
+Word n-grams: 1–2; min_df=3 ou 0,5%; max_df=0.7–0.85; limite de vocabulário ~30–60k.
+
+(Opcional) Char n-grams (3–5) combinados via FeatureUnion — ajuda contra variações.
+
+(Opcional) SVD/TruncatedSVD (LSA) para reduzir para 100–300 dimensões; acelera e estabiliza K-Means.
+
+Trilho B — Semântico moderno (mantendo o pé no chão)
+
+Embeddings de sentença em português (ex.: SBERT multilingue).
+
+Redução: UMAP (para 2–10D) somente para visualização; para cluster, use o embedding bruto (384–768D) ou uma PCA para ~100D.
+
+4) Agrupamento
+Opção 1 — K-Means (base confiável)
+
+Entrada: TF-IDF (com ou sem SVD).
+
+k: estimado por:
+
+Elbow (inércia),
+
+Silhouette (médio > 0.2 costuma ser ok em texto curto),
+
+Davies–Bouldin (menor é melhor),
+
+Estabilidade por reamostragem (AMI médio entre execuções com inicializações diferentes).
+
+Sugestão inicial: testar k em {10, 15, 20, 25, 30}. Com ~1.500 ementas, k≈15–25 tende a produzir temas manejáveis.
+
+Opção 2 — HDBSCAN (descobre k e outliers)
+
+Entrada: embeddings.
+
+Parâmetros: min_cluster_size 20–40; min_samples 5–10.
+
+Produz rótulo -1 para ruído/outliers (útil para ementas muito genéricas).
+
+Opção 3 — Hierárquico (Ward) para mapa global
+
+Entrada: TF-IDF+SVD (100–200D).
+
+Gera dendrograma; corte no nível que maximize Silhouette/Davies-Bouldin.
+
+5) Rotulagem automática dos clusters (tornar útil para humanos)
+
+Para cada cluster:
+
+Top termos TF-IDF internos (palavras/bi-gramas) — já com stopwords de domínio.
+
+Palavras com maior lift: razão TF-IDF no cluster vs. fora (melhor que só frequência).
+
+Frases representativas: 3–5 ementas mais próximas do centróide (ou com maior cluster probability no HDBSCAN).
+
+Gere um rótulo curto (ex.: “Violência doméstica”, “Mobilidade urbana”, “Acessibilidade e PCD”, “Incentivo ao esporte”).
+
+6) Validação e diagnóstico
+
+Métricas internas: Silhouette, Davies–Bouldin, Calinski–Harabasz.
+
+Coesão/Separação semântica: AMI/ARI entre:
+
+clusters × tema dominante (medida de concordância),
+
+clusters × bloco partidario (para ver alinhamentos temáticos).
+
+Sanity checks qualitativos: amostras por cluster para verificar se o rótulo faz sentido.
+
+Robustez: rode com seeds diferentes; meça estabilidade (ARI médio).
+
+7) Análises derivadas (onde sai ciência)
+
+Mapa de temas × política: distribuição de bloco partidario, partido principal, região por cluster.
+
+Efetividade por tema: taxa aprovado e dias tramitacao por cluster (medianas e ICs).
+
+Tendência temporal: frequência por ano; temas que crescem/caem.
+
+Outliers: examine cluster -1 (HDBSCAN) ou pontos com baixa pertença; muitas vezes revelam formulários/burocracia ou temas raros.
+
+8) Entregáveis
+
+Tabela final: id, ementa, cluster_id, rótulo_cluster, distância ao centróide, top_terms_cluster, e metadados originais.
+
+Sumário dos clusters: tamanho, palavras-chave, ementas exemplo, métricas.
+
+Visualização: UMAP t-SNE/UMAP 2D para navegação; cores por cluster, shapes por aprovado, bordas por bloco ideológico.
+
+Caderno de reprodutibilidade: script com seed fixa, versões de libs, e passos claros.
+
+Esqueleto técnico (Python, alto nível)
+# 1) Carregar CSV e selecionar colunas
+df = load_csv(...)
+texts = combine_fields(df['ementa'], df.get('ementa detalhada'))
+
+# 2) Limpeza
+clean = (texts
+         .pipe(normalize_unicode_lower)
+         .pipe(remove_law_refs_dates)      # regex
+         .pipe(remove_urls_punct_numbers)
+         .pipe(remove_stopwords(domain_list))
+         .pipe(lemmatize_pt))              # ou stemmer RSLP
+
+# 3A) TF-IDF (+ opcional SVD)
+X = TfIdf(ngram_range=(1,2), min_df=3, max_df=0.8).fit_transform(clean)
+X_red = TruncatedSVD(n_components=200, random_state=42).fit_transform(X)
+
+# 4A) K-Means
+best_k, best_model = model_selection_kmeans(X_red)
+labels = best_model.labels_
+
+# 5) Rotulagem de clusters
+summary = summarize_clusters(X, labels, texts)
+
+# 6) Validação
+scores = evaluate_internal(X_red, labels)  # silhouette, DB, estabilidade
+
+# 7) Cruzamentos analíticos
+report = cross_tabs(labels, df[['aprovado','bloco partidario','região','ano','dias tramitacao']])
+
+# 8) Exportar
+export_tables(labels, summary, scores, report)
+
+Alternativa com embeddings + HDBSCAN
+emb = sentence_embeddings_pt(clean)        # SBERT multilíngue
+labels = HDBSCAN(min_cluster_size=30, min_samples=7, metric='euclidean').fit_predict(emb)
+
+Parâmetros práticos (ponto de partida)
+
+TF-IDF: ngram_range=(1,2), min_df=3, max_df=0.8, sublinear_tf=True.
+
+SVD: n_components=200, random_state=42.
+
+K-Means: k∈{15,20,25}, n_init=20, max_iter=500, random_state=42.
+
+HDBSCAN: min_cluster_size≈30, min_samples≈7; ajuste para reduzir ruído excessivo.
+
+Avaliação: busque Silhouette ≥ 0.20 (texto curto é difícil), DB baixo, clusters interpretáveis.
+
+Como isso vira contribuição útil
+
+Um mapa temático confiável (derivado do texto, não só do rótulo administrativo).
+
+Indicadores por tema (aprovação, tempo, espectro político), prontos para teste de hipóteses.
+
+Reprodutibilidade: pipeline fixo, menos “achismo” e mais método.

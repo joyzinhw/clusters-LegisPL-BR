@@ -1,0 +1,223 @@
+📊 RELATÓRIO DE COLUNAS DOS ARQUIVOS EXCEL
+=====================================================
+
+📘 Arquivo: analisados.xlsx
+-----------------------------------------------------
+  🧩 Aba: Sheet1
+     - data
+     - partidos
+     - qtd_esquerda
+     - qtd_direita
+     - qtd_centrao
+
+
+📘 Arquivo: projetos_PL_2022_2024_transformado.xlsx
+-----------------------------------------------------
+  🧩 Aba: Sheet1
+     - id
+     - tipo
+     - numero
+     - ano
+     - ementa
+     - autores
+     - tipo de autor
+     - órgão inicial
+     - descrição inicial
+     - data da apresentação
+     - último órgão
+     - última tramitação
+     - data da última tramitação
+     - status atual
+     - temas
+     - finalizado
+     - aprovado
+     - dias_tramitacao
+     - tema_dominante
+     - uf_principal
+     - região
+     - partido_principal
+     - bloco_partidario
+     - apensada_ou_duplicada
+     - autoria_coletiva
+     - qtd_tramitacoes
+
+
+📘 Arquivo: projetos_PL_2022_completo.xlsx
+-----------------------------------------------------
+  🧩 Aba: Sheet1
+     - id
+     - tipo
+     - numero
+     - ano
+     - ementa
+     - autores
+     - tipo de autor
+     - órgão inicial
+     - descrição inicial
+     - data da apresentação
+     - último órgão
+     - última tramitação
+     - data da última tramitação
+     - status atual
+     - ementa detalhada
+     - temas
+
+
+📘 Arquivo: projetos_PL_2022_2024_completo.xlsx
+-----------------------------------------------------
+  🧩 Aba: Sheet1
+     - id
+     - tipo
+     - numero
+     - ano
+     - ementa
+     - autores
+     - tipo de autor
+     - órgão inicial
+     - descrição inicial
+     - data da apresentação
+     - último órgão
+     - última tramitação
+     - data da última tramitação
+     - status atual
+     - temas
+
+
+📘 Arquivo: projetos_PL_2021_2024_completo.xlsx
+-----------------------------------------------------
+  🧩 Aba: Sheet1
+     - id
+     - tipo
+     - numero
+     - ano
+     - ementa
+     - autores
+     - tipo de autor
+     - órgão inicial
+     - descrição inicial
+     - data da apresentação
+     - último órgão
+     - última tramitação
+     - data da última tramitação
+     - status atual
+     - data_status
+     - ementa detalhada
+     - temas
+
+
+📘 Arquivo: projetos_PL_2021_2024_transformado_com_composição.xlsx
+-----------------------------------------------------
+  🧩 Aba: Sheet1
+     - id
+     - tipo
+     - numero
+     - ano
+     - ementa
+     - autores
+     - tipo de autor
+     - órgão inicial
+     - descrição inicial
+     - data da apresentação
+     - último órgão
+     - última tramitação
+     - data da última tramitação
+     - status atual
+     - data_status
+     - ementa detalhada
+     - temas
+     - ano_eleitoral
+     - governo
+     - finalizado
+     - aprovado
+     - dias_tramitacao
+     - tema_dominante
+     - uf_principal
+     - região
+     - partido_principal
+     - bloco_partidario
+     - apensada_ou_duplicada
+     - autoria_coletiva
+     - qtd_tramitacoes
+     - data
+     - qtd_esquerda
+     - qtd_direita
+     - qtd_centrao
+
+
+📘 Arquivo: projetos_PL_clusters_umap.xlsx
+-----------------------------------------------------
+  🧩 Aba: Sheet1
+     - id
+     - tipo
+     - numero
+     - ano
+     - ementa
+     - autores
+     - último órgão
+     - última tramitação
+     - data da última tramitação
+     - cluster_kmeans
+     - x_umap
+     - y_umap
+
+
+📘 Arquivo: datas.xlsx
+-----------------------------------------------------
+  🧩 Aba: Sheet1
+     - data
+     - partidos
+
+
+📘 Arquivo: projetos_PL_2021_2024_transformado.xlsx
+-----------------------------------------------------
+  🧩 Aba: Sheet1
+     - id
+     - tipo
+     - numero
+     - ano
+     - ementa
+     - autores
+     - tipo de autor
+     - órgão inicial
+     - descrição inicial
+     - data da apresentação
+     - último órgão
+     - última tramitação
+     - data da última tramitação
+     - status atual
+     - data_status
+     - ementa detalhada
+     - temas
+     - ano_eleitoral
+     - governo
+     - finalizado
+     - aprovado
+     - dias_tramitacao
+     - tema_dominante
+     - uf_principal
+     - região
+     - partido_principal
+     - bloco_partidario
+     - apensada_ou_duplicada
+     - autoria_coletiva
+     - qtd_tramitacoes
+
+
+📘 Arquivo: filiacoes_deputados.xlsx
+-----------------------------------------------------
+  🧩 Aba: Sheet1
+     - id
+     - nome_deputado
+     - sigla_partido
+     - data_entrada_partido
+     - data_saida_partido
+
+
+📘 Arquivo: entradas_saidas_deputados.xlsx
+-----------------------------------------------------
+  🧩 Aba: Sheet1
+     - id
+     - nome_deputado
+     - data_entrada
+     - data_saida
+

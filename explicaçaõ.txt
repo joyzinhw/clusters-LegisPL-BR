@@ -1,0 +1,17 @@
+O código serve para:
+
+Analisar proposições legislativas (PLs) detalhadas em um Excel, considerando tanto a ementa quanto os temas associados.
+
+Gerar embeddings semânticos das sub-ementas e dos temas usando Sentence-BERT em português.
+
+Calcular similaridade semântica média de cada ementa em relação aos seus temas.
+
+Clusterizar os PLs com base nessa similaridade, formando grupos de proposições semanticamente parecidas.
+
+Avaliar o desempenho dos clusters com métricas internas (Silhouette, Davies–Bouldin, Calinski–Harabasz) e externas (ARI e NMI comparando com os temas originais).
+
+Visualizar os clusters em um gráfico t-SNE 2D.
+
+Gerar resumos de qual tema predomina em cada cluster.
+
+Salvar os resultados completos em arquivos CSV.

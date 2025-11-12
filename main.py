@@ -1,99 +1,141 @@
 # main.py
-"""
-Orquestra pipeline: processamento -> vetorizacao -> clustering -> UMAP -> salvar resultados e figuras.
-"""
-import os
-import joblib
-import numpy as np
+# Joyce Moura - Clusterização sem visualizações (salva CSVs)
+
 import pandas as pd
-import matplotlib.pyplot as plt
-
+from collections import Counter, defaultdict
 from sklearn.cluster import KMeans
-from umap import UMAP
+from sklearn.preprocessing import LabelEncoder
+from sklearn.metrics import (
+    silhouette_score,
+    davies_bouldin_score,
+    calinski_harabasz_score,
+    adjusted_rand_score,
+    normalized_mutual_info_score
+)
+from limpeza import carregar_dados
+from similaridades import gerar_embeddings, calcular_similaridade_media
 
-from processamento_dados import carregar_transformar, salvar
-from similaridade_textual import computar_tfidf, computar_sbert_embeddings, salvar_objeto
+# ===============================
+# 1️⃣ Carregar dados
+# ===============================
+df = carregar_dados("LegisPL-BR-main/dados/projetos_PL_2021_2024_completo.xlsx")
 
+# Criar ID único para cada ementa (se ainda não existir)
+df = df.reset_index().rename(columns={'index': 'ID'})
 
+# ===============================
+# 2️⃣ Remover linhas com erro no tema
+# ===============================
+df = df[~df['tema_principal'].str.startswith("Erro")].reset_index(drop=True)
 
-OUTPUT_DIR = "outputs"
+# ===============================
+# 3️⃣ Gerar embeddings e similaridades
+# ===============================
+model_name = 'neuralmind/bert-base-portuguese-cased'
+all_sub_ementas = sum(df['sub_ementas'].tolist(), [])
+model, embeddings_sub_ementas = gerar_embeddings(model_name, all_sub_ementas)
+df = calcular_similaridade_media(df, model, embeddings_sub_ementas)
 
-def rodar_pipeline(
-    input_path=None,
-    n_clusters=12,
-    use_sbert=False,
-    sbert_model="modelos/sbert_paraphrase_multilingual",
-    random_state=42
-):
-    os.makedirs(OUTPUT_DIR, exist_ok=True)
-    # 1. Carregar / processar dados
-    df = carregar_transformar(input_path) if input_path else carregar_transformar()
-    salvar(df)  # salva CSV/PKL padronizado
+# ===============================
+# 4️⃣ Clusterização automática com KMeans
+# ===============================
+sil_scores = {}
+X = df['similaridade'].values.reshape(-1, 1)
 
-    corpus = df["ementa"].astype(str).tolist()
+for k in range(5, 51, 5):
+    kmeans = KMeans(n_clusters=k, random_state=42, n_init=10)
+    labels = kmeans.fit_predict(X)
+    sil_scores[k] = silhouette_score(X, labels)
 
-    # 2. TF-IDF
-    vect, X_tfidf = computar_tfidf(corpus, max_features=20000)
-    salvar_objeto(vect, os.path.join(OUTPUT_DIR, "tfidf_vectorizer.pkl"))
-    from scipy import sparse
-    sparse.save_npz(os.path.join(OUTPUT_DIR, "tfidf_matrix.npz"), X_tfidf)
+best_k = max(sil_scores, key=sil_scores.get)
 
-    # 3. KMeans sobre TF-IDF (sparse -> usar dense reduced é melhor; aqui usamos KMeans direto sobre TF-IDF densificado por SVD opcional)
-    # Recomendo usar TruncatedSVD para reduzir dimensionalidade antes do KMeans (por performance)
-    from sklearn.decomposition import TruncatedSVD
-    print("[i] Reduzindo TF-IDF com TruncatedSVD...")
-    svd = TruncatedSVD(n_components=128, random_state=random_state)
-    X_reduced = svd.fit_transform(X_tfidf)
-    joblib.dump(svd, os.path.join(OUTPUT_DIR, "svd_tfidf.pkl"))
+kmeans_final = KMeans(n_clusters=best_k, random_state=42, n_init=10)
+df['cluster'] = kmeans_final.fit_predict(X)
 
-    print(f"[i] Treinando KMeans (k={n_clusters}) sobre representação TF-IDF reduzida...")
-    kmeans = KMeans(n_clusters=n_clusters, random_state=random_state, n_init=10)
-    labels = kmeans.fit_predict(X_reduced)
-    df["cluster_kmeans_tfidf"] = labels
-    joblib.dump(kmeans, os.path.join(OUTPUT_DIR, "kmeans_tfidf.pkl"))
+# ===============================
+# 5️⃣ Métricas de desempenho
+# ===============================
+silhouette = silhouette_score(X, df['cluster'])
+davies = davies_bouldin_score(X, df['cluster'])
+calinski = calinski_harabasz_score(X, df['cluster'])
 
-    # 4. UMAP para visualização (das reduções)
-    umap = UMAP(n_components=2, random_state=random_state)
-    embedding_2d = umap.fit_transform(X_reduced)
-    df["x_umap_tfidf"] = embedding_2d[:,0]
-    df["y_umap_tfidf"] = embedding_2d[:,1]
-    joblib.dump(umap, os.path.join(OUTPUT_DIR, "umap_tfidf.pkl"))
+label_encoder = LabelEncoder()
+y_true = label_encoder.fit_transform(df['tema_principal'])
+y_pred = df['cluster']
 
-    # 5. Se SBERT pedido: calcular embeddings e clusters (opcional)
-    if use_sbert:
-        try:
-            embs = computar_sbert_embeddings(corpus, model_name=sbert_model)
-            np.save(os.path.join(OUTPUT_DIR, "sbert_embeddings.npy"), embs)
-            kmeans_sbert = KMeans(n_clusters=n_clusters, random_state=random_state, n_init=10)
-            labels_sbert = kmeans_sbert.fit_predict(embs)
-            df["cluster_kmeans_sbert"] = labels_sbert
-            joblib.dump(kmeans_sbert, os.path.join(OUTPUT_DIR, "kmeans_sbert.pkl"))
+ari = adjusted_rand_score(y_true, y_pred)
+nmi = normalized_mutual_info_score(y_true, y_pred)
 
-            umap_s = UMAP(n_components=2, random_state=random_state)
-            emb_s_2d = umap_s.fit_transform(embs)
-            df["x_umap_sbert"] = emb_s_2d[:,0]
-            df["y_umap_sbert"] = emb_s_2d[:,1]
-            joblib.dump(umap_s, os.path.join(OUTPUT_DIR, "umap_sbert.pkl"))
-        except Exception as e:
-            print("[warn] SBERT falhou:", e)
+# Salvar métricas
+df_metricas = pd.DataFrame([{
+    'Silhouette': silhouette,
+    'Davies-Bouldin': davies,
+    'Calinski-Harabasz': calinski,
+    'ARI': ari,
+    'NMI': nmi,
+    'Melhor k': best_k
+}])
+df_metricas.to_csv("metricas_clusters_semanticos.csv", index=False)
+print(df_metricas)
+# ===============================
+# 6️⃣ Resumo por cluster (tema predominante)
+# ===============================
+cluster_resumo = []
+for cluster_id in sorted(df['cluster'].unique()):
+    temas_lista = sum(df[df['cluster'] == cluster_id]['tokens_temas'].tolist(), [])
+    if len(temas_lista) == 0:
+        continue
+    temas_contagem = Counter(temas_lista)
+    tema_predominante, freq = temas_contagem.most_common(1)[0]
+    total = sum(temas_contagem.values())
+    percentual = (freq / total) * 100
+    cluster_resumo.append({
+        'Cluster': cluster_id,
+        'Tema Predominante': tema_predominante,
+        'Frequência': freq,
+        'Percentual': round(percentual, 2)
+    })
 
-    # 6. Salvar resultados finais
-    df.to_csv(os.path.join(OUTPUT_DIR, "projetos_PL_clusters_umap.csv"), index=False)
-    print("[i] Resultados salvos em:", os.path.join(OUTPUT_DIR, "projetos_PL_clusters_umap.csv"))
+df_cluster_resumo = pd.DataFrame(cluster_resumo)
+df_cluster_resumo.to_csv("resumo_clusters_por_tema_predominante.csv", index=False)
+print(df_cluster_resumo)
+# ===============================
+# 7️⃣ Agrupar clusters pelo mesmo tema
+# ===============================
+tema_clusters = defaultdict(list)
+for _, row in df_cluster_resumo.iterrows():
+    tema_clusters[row['Tema Predominante']].append({
+        'Cluster': row['Cluster'],
+        'Frequência': row['Frequência'],
+        'Percentual': row['Percentual']
+    })
 
-    # 7. Gerar figuras simples
-    plt.figure(figsize=(8,6))
-    scatter = plt.scatter(df["x_umap_tfidf"], df["y_umap_tfidf"], c=df["cluster_kmeans_tfidf"], s=8)
-    plt.title("UMAP (TF-IDF reduzido) + KMeans")
-    plt.xlabel("UMAP 1")
-    plt.ylabel("UMAP 2")
-    plt.colorbar(scatter, label="cluster")
-    plt.tight_layout()
-    plt.savefig(os.path.join(OUTPUT_DIR, "umap_tfidf_kmeans.png"), dpi=200)
-    plt.close()
-    print("[i] Figura salva:", os.path.join(OUTPUT_DIR, "umap_tfidf_kmeans.png"))
+agrupado = []
+for tema, clusters_info in tema_clusters.items():
+    total_freq = sum(c['Frequência'] for c in clusters_info)
+    percentual_total = round(total_freq / sum(df_cluster_resumo['Frequência']) * 100, 2)
+    agrupado.append({
+        'Tema': tema,
+        'Clusters': [c['Cluster'] for c in clusters_info],
+        'Frequência Total': total_freq,
+        'Percentual Total': percentual_total
+    })
 
-    return df
+df_agrupado = pd.DataFrame(agrupado).sort_values(by='Frequência Total', ascending=False)
+df_agrupado.to_csv("resumo_agrupado_clusters_por_tema.csv", index=False)
+print(df_agrupado)
+# ===============================
+# 8️⃣ Mapear IDs de ementas para cluster e tema predominante
+# ===============================
+# Criar mapeamento cluster -> tema predominante
+cluster_to_tema = dict(zip(df_cluster_resumo['Cluster'], df_cluster_resumo['Tema Predominante']))
+df['Tema_Cluster'] = df['cluster'].map(cluster_to_tema)
 
-if __name__ == "__main__":
-    df_out = rodar_pipeline(use_sbert=False, n_clusters=12)
+# Salvar CSV com IDs, cluster e tema
+df_ids = df[['ID', 'cluster', 'Tema_Cluster', 'ementa detalhada']]
+df_ids.to_csv("ementas_por_cluster_e_tema.csv", index=False)
+
+# ===============================
+# 9️⃣ Salvar dataset completo
+# ===============================
+df.to_csv("resultados_clusters_semanticos.csv", index=False)
